@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Opere (SPARQL)</title>
+  <style>
+    body { font-family: Segoe UI; margin: 2em; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #f4f4f4; }
+  </style>
+</head>
+<body>
+  <h1 id=lblTitle>Opere di </h1>
+  <p id="lblLoading">Loading...</p>
+
+  <table id="results">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Autore</th>
+        <th>Opera</th>
+        <th>Data</th>
+        <th>Materiale</th>
+        <th>Descrizione</th>
+        <th>Proprietà</th>
+        <th>Località</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+  
+	function capitalize(str) {
+	  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+	}
+	
+	function capitalizeText(str) {
+	  return str
+		.split(" ")
+		.map(word => capitalize(word))
+		.join(" ");
+	}
+
+
+
+	var uniqueIDs = [];
+	
+	const endpoint="https://dati.beniculturali.it/sparql?query=";
+	
+	var author = 'merisi';
+	var city = 'venezia';
+	var masterpieceName = 'madonna';
+	
+	document.getElementById('lblTitle').innerText = "Opere di " + capitalizeText(author) + " a " + capitalizeText(city) + " (" + capitalizeText(masterpieceName) + ")";
+    var query = `
+
+			SELECT DISTINCT
+			  ?uniqueID
+			  ?masterpiece
+			  ?masterpiece_name
+			  ?author_label
+			  ?description
+			  ?date_label
+			  ?rights_label
+			  ?coverage_label
+			  ?material_label
+			  ?site_description
+			  ?location
+			  ?preview_uri
+			  ?subject
+			
+			 WHERE {
+			  ?author a-cd:isAuthorOf ?masterpiece .
+			  ?masterpiece rdfs:label ?masterpiece_name .
+			  ?author rdfs:label ?author_label .
+			  ?masterpiece a-cd:subject ?subject .
+			  
+			  OPTIONAL {
+				?masterpiece dc:description ?description .
+			  }
+			  
+			  OPTIONAL { ?masterpiece arco:uniqueIdentifier ?uniqueID . }
+			  OPTIONAL { ?masterpiece dc:rights ?rights_label . }
+			  OPTIONAL { ?masterpiece dc:date ?date_label . }
+			  OPTIONAL { ?masterpiece dc:coverage ?coverage_label . }
+			  OPTIONAL { ?masterpiece pico:materialAndTechnique ?material_label . }
+			  
+			  
+			  
+			OPTIONAL {
+				?masterpiece a-cd:hasDating ?dating .
+				?dating rdfs:label ?date_label .
+			  }  
+			  
+			OPTIONAL {
+				?masterpiece a-loc:hasTimeIndexedTypedLocation ?location .
+			  }			  
+			OPTIONAL { ?location arco:description ?site_description . }
+			
+			OPTIONAL { ?masterpiece pico:preview ?preview_uri . }
+			  			  
+						  
+			FILTER(CONTAINS(LCASE(STR(?author_label)), "@#@AUTHOR@#@"))	
+			FILTER(CONTAINS(LCASE(STR(?coverage_label)), "@#@CITY@#@"))
+			FILTER(CONTAINS(LCASE(STR(?masterpiece_name)),  "@#@MASTERPIECE_NAME@#@"))
+				
+			FILTER (lang(?masterpiece_name) = "it")			
+			 
+			}
+			LIMIT 100
+		`;
+
+//			FILTER(CONTAINS(LCASE(STR(?masterpiece_name)),  "@#@MASTERPIECE_TYPE@#@"))
+
+	// FILTER(CONTAINS(LCASE(STR(?coverage_label)), "roma"))	
+	// FILTER(CONTAINS(LCASE(STR(?description)), "san girolamo"))
+	
+	/*
+				  ?uniqueID
+			  ?masterpiece
+			  ?masterpiece_name
+			  ?author_label
+			  ?description
+			  ?date_label
+			  ?rights_label
+			  ?coverage_label
+			  ?material_label
+			  ?location
+
+	
+	
+	
+	OPTIONAL {
+    ?masterpiece arco:hasLocation ?location .
+    OPTIONAL { ?location dct:description ?site_description . }
+    OPTIONAL { ?location arco-dd:description ?site_description . }
+  }
+	*/
+
+	query = query.replace("@#@AUTHOR@#@", author);
+	query = query.replace("@#@CITY@#@", city);
+	query = query.replace("@#@MASTERPIECE_NAME@#@", masterpieceName);
+	
+	const url = endpoint + query;
+
+    // Funzione per interrogare SPARQL endpoint e aggiornare la tabella
+    async function fetchSPARQL() {
+      
+	  try {
+			  const response = await fetch(url, {
+				headers: { "Accept": "application/sparql-results+json" }
+			  });
+		  
+			const lblLoading = document.getElementById("lblLoading");
+			lblLoading.innerText = 'Ready';
+			const data = await response.json();
+			console.log(data);
+			const tbody = document.querySelector("#results tbody");
+			tbody.innerHTML = ""; // resetta tabella
+
+			uniqueIDs.length = 0;
+			var rowCount = 0;
+			data.results.bindings.sort((p, q) => p.coverage_label?.value.localeCompare(q.coverage_label?.value));
+			data.results.bindings.forEach(row => {
+				//console.log((rowCount++).toString() + ':' + row.uniqueID?.value);
+				if (row.uniqueID != null) {
+				if (uniqueIDs.indexOf(row.uniqueID?.value) == -1) {
+					const tr = document.createElement("tr");
+					tr.innerHTML = `
+					  <td><a href="${row.masterpiece?.value}" target="_blank">${row.uniqueID?.value}</a></td>
+					  <td>${row.author_label?.value}</td>
+					  <td>${row.subject?.value}</td>
+					  <td>${row.date_label?.value}</td>
+					  <td>${row.material_label?.value}</td>
+					  <td>${row.description?.value}</td>
+					  <td>${row.rights_label?.value}</td>
+					  <td>${row.coverage_label?.value}</td>
+					  <td><a href="${row.preview_uri?.value}" target="_blank">${row.preview_uri != null ? 'View' : ''}</a></td>
+					`;
+					
+					tbody.appendChild(tr);
+					uniqueIDs.push(row.uniqueID?.value);			
+				}
+				}			
+			});
+
+	  } catch (error) {
+		  console.error("Caught an error:", error.message);
+	  }
+	  
+
+    }
+
+    // Avvia il fetch
+    fetchSPARQL();
+  </script>
+</body>
+</html>
