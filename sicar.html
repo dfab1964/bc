@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Elenco risorse SICAR</title>
+  <style>
+    body { font-family: Segoe UI, sans-serif; margin: 2rem;}
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; }
+    th { background: #f0f0f0; }
+	button { font-family: Segoe UI;}
+  </style>
+</head>
+<body>
+  <h1 id="lblTitle">Risorse da SICAR</h1>
+  <button id="load" onclick="loadData()">Carica risorse</button>
+  <table id="results" hidden>
+    <thead>
+      <tr><th>Indice</th><th>ID</th><th>Autore</th><th>Data</th><th>Titolo</th><th>Gruppo di lavoro</th><th>Luogo</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <script>
+	
+	async function fetchData(endpoint) {
+		var data;
+		try {
+			const resp = await fetch(endpoint);
+			if (!resp.ok) throw new Error(`Status ${resp.status}`);
+			data = await resp.json();
+		} 
+		catch (e) {
+			alert('Errore: ' + e);
+			console.error(e);
+		}
+		
+		return data;
+	}
+  
+	function fillTable(data) {
+		// item.id.split(":").pop()
+        const tb = document.querySelector('#results tbody');
+        tb.innerHTML = '';
+		for (var i = 0; i < data.docs.length; i++) {
+			const tr = document.createElement('tr');
+			var item = data.docs[i];
+			tr.innerHTML = `
+				<td>${i+1}</td>
+				<td><a href="${item.resource_url}" target="_blank">${item.id}</a></td>
+				<td>${item.author != null ? item.author : item.creator}</td>
+				<td>${item.date}</td>
+				<td>${item.title}</td>
+				<td>${item.sicar_workgroup_name}</td>
+				<td>${item.sicar_workgroup_location}</td>
+			  `;
+			tb.appendChild(tr);
+		}
+		document.getElementById('results').hidden = false;
+	}
+	
+	async function loadData() {
+		const base = 'http://sicar.beniculturali.it:8080/SIMBA-API/select';
+		var cardType = 'pcs_cantieri_restauro';
+		var endpoint = base + '?start=0&rows=400&type=' + cardType + '&orderby_asc_desc=ASC&orderby=identifier'; //&type=opere_mobili&orderby_asc_desc=ASC&orderby=identifier';
+		
+		var data = await fetchData(endpoint);
+		fillTable(data);
+		document.getElementById('lblTitle').innerText = 'Risorse da SICAR (' + cardType + ')';
+	}
+	
+  </script>
+</body>
+</html>
